@@ -1,53 +1,95 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
 #include <Geode/modify/LevelCell.hpp>
+#include <Geode/utils/web.hpp>
+#include <unordered_map>
 
 using namespace geode::prelude;
 
-class $modify(TslLevelInfoLayer, LevelInfoLayer) {
-	bool init(GJGameLevel* level, bool challenge) {
-		if (!LevelInfoLayer::init(level, challenge)) return false;
+static std::unordered_map<int, int> tsl;
 
-		auto difficultyLabel = CCLabelBMFont::create("TSL: #313", "bigFont.fnt");
+static void loadTSL() {
+    auto r = web::WebRequest().getSync(
+        "https://tslbackend-v2.shittylist.workers.dev/api/ordered-levels?list_id=main"
+    );
 
-		if (!difficultyLabel) return true;
+    if (!r.ok())
+        return;
 
-		difficultyLabel->setScale(0.35f);
-		difficultyLabel->setAnchorPoint({0.5f, 1.f});
+    auto data = r.json();
 
-		auto difficulty = this->m_difficultySprite;
+    if (!data)
+        return;
 
-		if (!difficulty) return true;
+    for (auto& e : data.unwrap()) {
+        auto id = e["content"]["id"].asInt();
+        auto pos = e["position"].asInt();
 
-		auto pos = difficulty->getPosition();
+        if (id && pos)
+            tsl[(int)id.unwrap()] = (int)pos.unwrap();
+    }
+}
 
-		difficultyLabel->setPosition(
-			pos.x,
-			pos.y - difficulty->getContentSize().height / 2.f - 6.f
-		);
+class $modify(TslLevelInfo, LevelInfoLayer) {
+    bool init(GJGameLevel* level, bool challenge) {
+        if (!LevelInfoLayer::init(level, challenge))
+            return false;
 
-		this->addChild(difficultyLabel, 1000);
+        if (!tsl.contains(level->m_levelID))
+            return true;
 
-		return true;
-	}
+        auto difficulty = this->m_difficultySprite;
+
+        if (!difficulty)
+            return true;
+
+        auto label = CCLabelBMFont::create(
+            fmt::format("TSL: #{}", tsl[level->m_levelID]).c_str(),
+            "bigFont.fnt"
+        );
+
+        if (!label)
+            return true;
+
+        auto pos = difficulty->getPosition();
+
+        label->setScale(0.35f);
+        label->setAnchorPoint({0.5f, 1.f});
+        label->setPosition(
+            pos.x,
+            pos.y - difficulty->getContentSize().height / 2.f
+            - (level->m_coins > 0 ? 14.f : 6.f)
+        );
+
+        this->addChild(label, 1000);
+
+        return true;
+    }
 };
 
 class $modify(TslLevelCell, LevelCell) {
-	void loadFromLevel(GJGameLevel* level) {
-		LevelCell::loadFromLevel(level);
+    void loadFromLevel(GJGameLevel* level) {
+        LevelCell::loadFromLevel(level);
 
-		auto testLabel = CCLabelBMFont::create("TSL: #313", "bigFont.fnt");
+        if (!tsl.contains(level->m_levelID))
+            return;
 
-		if (!testLabel) return;
+        auto label = CCLabelBMFont::create(
+            fmt::format("TSL: #{}", tsl[level->m_levelID]).c_str(),
+            "bigFont.fnt"
+        );
 
-		testLabel->setScale(0.3f);
-		testLabel->setAnchorPoint({0.f, 0.5f});
+        if (!label)
+            return;
 
-		testLabel->setPosition(
-			290.f,
-			14.f
-		);
+        label->setScale(0.3f);
+        label->setAnchorPoint({0.f, 0.5f});
+        label->setPosition(290.f, 14.f);
 
-		this->addChild(testLabel, 1000);
-	}
+        this->addChild(label, 1000);
+    }
 };
+
+$on_mod(Loaded) {
+    loadTSL();
+}
