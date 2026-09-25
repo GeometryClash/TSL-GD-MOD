@@ -17,7 +17,7 @@
     "settings": {
         "enabled": {
             "name": "Enabled",
-            "description": "Enable TSL positions",
+            "description": "Enable TSL Mod",
             "type": "bool",
             "default": true
         }
