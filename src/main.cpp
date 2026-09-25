@@ -35,6 +35,9 @@ class $modify(TslLevelInfo, LevelInfoLayer) {
         if (!LevelInfoLayer::init(level, challenge))
             return false;
 
+        if (!Mod::get()->getSettingValue<bool>("enabled"))
+            return true;
+
         if (!tsl.contains(level->m_levelID))
             return true;
 
@@ -70,6 +73,9 @@ class $modify(TslLevelInfo, LevelInfoLayer) {
 class $modify(TslLevelCell, LevelCell) {
     void loadFromLevel(GJGameLevel* level) {
         LevelCell::loadFromLevel(level);
+
+        if (!Mod::get()->getSettingValue<bool>("enabled"))
+            return;
 
         if (!tsl.contains(level->m_levelID))
             return;
